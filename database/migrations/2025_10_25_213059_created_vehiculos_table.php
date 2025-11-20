@@ -10,13 +10,20 @@ return new class extends Migration
     {
         Schema::create('vehiculos', function (Blueprint $table) {
             $table->id();
-            $table->string('vehiculo_id')->nullable()->index(); // ID de serverProfe
+            $table->string('vehiculo_id')->nullable()->index();
             $table->string('placa')->index();
             $table->string('marca')->nullable();
             $table->string('modelo')->nullable();
-           // $table->boolean('activo')->default(true);
-            $table->foreignId('user_id')->nullable()->constrained()->onDelete('cascade'); // Usuario local
-            $table->string('perfil_id'); // UUID del perfil de serverProfe
+
+            // campos nuevos
+            $table->boolean('activo')->default(true);
+            $table->foreignId('current_driver_id')->nullable()->constrained('users')->onDelete('set null');
+            $table->string('status')->default('available');
+            $table->integer('capacity')->nullable();
+            $table->integer('year')->nullable();
+
+            $table->foreignId('user_id')->nullable()->constrained()->onDelete('cascade');
+            $table->string('perfil_id');
             $table->timestamps();
         });
     }

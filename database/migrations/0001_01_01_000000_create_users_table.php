@@ -17,6 +17,14 @@ return new class extends Migration
             $table->string('email')->unique();
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
+
+            // nuevos campos para conductores
+            $table->string('role')->default('conductor');
+            $table->string('driver_license')->nullable();
+            $table->foreignId('current_vehicle_id')->nullable()->constrained('vehiculos')->onDelete('set null');
+            $table->boolean('is_active_driver')->default(false);
+            $table->string('phone')->nullable();
+
             $table->rememberToken();
             $table->timestamps();
         });
