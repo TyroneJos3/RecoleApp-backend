@@ -11,81 +11,92 @@ use Illuminate\Support\Facades\Log;
 
 class PosicionController extends Controller
 {
-
     public function store(Request $request)
-    {
-        $validator = Validator::make($request->all(), [
-            'recorrido_id' => 'required|string',
-            'lat' => 'required|numeric|between:-90,90',
-            'lon' => 'required|numeric|between:-180,180',
-            'timestamp' => 'sometimes|date',
-            'altitud' => 'sometimes|numeric',
-            'precision' => 'sometimes|numeric|min:0',
-            'velocidad' => 'sometimes|numeric|min:0',
-            'rumbo' => 'sometimes|numeric|between:0,360',
-        ]);
+{
+    $validator = Validator::make($request->all(), [
+        'recorrido_id' => 'required|string',
+        'latitud' => 'sometimes|numeric|between:-90,90',
+        'longitud' => 'sometimes|numeric|between:-180,180',
+        'lat' => 'sometimes|numeric|between:-90,90',
+        'lon' => 'sometimes|numeric|between:-180,180',
+        'timestamp' => 'sometimes|date',
+        'altitud' => 'sometimes|numeric',
+        'precision' => 'sometimes|numeric|min:0',
+        'velocidad' => 'sometimes|numeric|min:0',
+        'rumbo' => 'sometimes|numeric|between:0,360',
+    ]);
 
-        if ($validator->fails()) {
+    if ($validator->fails()) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Error de validación',
+            'errors' => $validator->errors()
+        ], 422);
+    }
+
+    try {
+        $recorrido = Recorrido::where('recorrido_remoto_id', $request->recorrido_id)
+            ->where('activo', true)
+            ->first();
+
+        if (!$recorrido) {
             return response()->json([
                 'success' => false,
-                'message' => 'Error de validación',
-                'errors' => $validator->errors()
+                'message' => 'Recorrido no encontrado o no está activo'
+            ], 404);
+        }
+
+        $lat = $request->latitud ?? $request->lat;
+        $lon = $request->longitud ?? $request->lon;
+
+        if (!$lat || !$lon) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Se requieren coordenadas (lat/lon o latitud/longitud)'
             ], 422);
         }
 
-        try {
-            // Verificar que el recorrido existe y está activo
-            $recorrido = Recorrido::where('recorrido_remoto_id', $request->recorrido_id)
-                ->where('activo', true)
-                ->first();
+        $posicion = Posicion::create([
+            'recorrido_id' => $request->recorrido_id,
+            'lat' => $lat,
+            'lon' => $lon,
+            'timestamp' => $request->timestamp ?? now(),
+            'altitud' => $request->altitud,
+            'precision' => $request->precision,
+            'velocidad' => $request->velocidad,
+            'rumbo' => $request->rumbo,
+        ]);
 
-            if (!$recorrido) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Recorrido no encontrado o no está activo'
-                ], 404);
-            }
-
-            $posicion = Posicion::create([
+        // log solo cada 10 posiciones para no saturar los logs
+        if ($posicion->id % 10 === 0) {
+            Log::info('Posición registrada', [
                 'recorrido_id' => $request->recorrido_id,
-                'lat' => $request->lat,
-                'lon' => $request->lon,
-                'timestamp' => $request->timestamp ?? now(),
-                'altitud' => $request->altitud,
-                'precision' => $request->precision,
-                'velocidad' => $request->velocidad,
-                'rumbo' => $request->rumbo,
+                'posicion_id' => $posicion->id,
+                'lat' => $lat,
+                'lon' => $lon
             ]);
-
-            // Log solo cada 10 posiciones para no saturar los logs
-            if ($posicion->id % 10 === 0) {
-                Log::info('Posición registrada', [
-                    'recorrido_id' => $request->recorrido_id,
-                    'posicion_id' => $posicion->id,
-                    'lat' => $request->lat,
-                    'lon' => $request->lon
-                ]);
-            }
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Posición registrada correctamente',
-                'data' => $posicion
-            ], 201);
-
-        } catch (\Exception $e) {
-            Log::error('Error al registrar posición', [
-                'error' => $e->getMessage(),
-                'recorrido_id' => $request->recorrido_id
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Error al registrar la posición',
-                'error' => $e->getMessage()
-            ], 500);
         }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Posición registrada correctamente',
+            'data' => $posicion
+        ], 201);
+
+    } catch (\Exception $e) {
+        Log::error('Error al registrar posición', [
+            'error' => $e->getMessage(),
+            'recorrido_id' => $request->recorrido_id,
+            'request' => $request->all()
+        ]);
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Error al registrar la posición',
+            'error' => $e->getMessage()
+        ], 500);
     }
+}
 
     public function porRecorrido($recorridoId)
     {

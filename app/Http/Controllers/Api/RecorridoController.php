@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Recorrido;
+use App\Http\Resources\RecorridoResource;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class RecorridoController extends Controller
 {
@@ -14,15 +16,19 @@ class RecorridoController extends Controller
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'recorrido_remoto_id' => 'required|string|unique:recorridos,recorrido_remoto_id',
             'ruta_id' => 'required|string',
-            'vehiculo_id' => 'required|string',
+            'vehiculo_id' => 'required|integer',
             'conductor_id' => 'required|string',
             'inicio' => 'required|date',
             'activo' => 'sometimes|boolean',
         ]);
 
         if ($validator->fails()) {
+            Log::error('Validación fallida en store recorrido', [
+                'errors' => $validator->errors(),
+                'request' => $request->all()
+            ]);
+
             return response()->json([
                 'success' => false,
                 'message' => 'Error de validación',
@@ -31,10 +37,13 @@ class RecorridoController extends Controller
         }
 
         try {
+            // Generar un UUID único para recorrido_remoto_id
+            $recorridoRemotoId = Str::uuid()->toString();
+
             $recorrido = Recorrido::create([
-                'recorrido_remoto_id' => $request->recorrido_remoto_id,
+                'recorrido_remoto_id' => $recorridoRemotoId,
                 'ruta_id' => $request->ruta_id,
-                'vehiculo_id' => $request->vehiculo_id,
+                'vehiculo_id' => (string) $request->vehiculo_id,
                 'conductor_id' => $request->conductor_id,
                 'inicio' => $request->inicio,
                 'activo' => $request->activo ?? true,
@@ -49,13 +58,14 @@ class RecorridoController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Recorrido iniciado correctamente',
-                'data' => $recorrido
+                'data' => new RecorridoResource($recorrido)
             ], 201);
 
         } catch (\Exception $e) {
             Log::error('Error al crear recorrido', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
+                'request' => $request->all()
             ]);
 
             return response()->json([
@@ -75,7 +85,7 @@ class RecorridoController extends Controller
 
             return response()->json([
                 'success' => true,
-                'data' => $recorrido
+                'data' => new RecorridoResource($recorrido)
             ]);
 
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
@@ -138,7 +148,7 @@ class RecorridoController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Recorrido finalizado correctamente',
-                'data' => $recorrido
+                'data' => new RecorridoResource($recorrido)
             ]);
 
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
@@ -172,7 +182,7 @@ class RecorridoController extends Controller
             return response()->json([
                 'success' => true,
                 'total' => $recorridos->count(),
-                'data' => $recorridos
+                'data' => RecorridoResource::collection($recorridos)
             ]);
 
         } catch (\Exception $e) {
