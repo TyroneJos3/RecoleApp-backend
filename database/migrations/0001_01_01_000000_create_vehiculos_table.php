@@ -15,14 +15,16 @@ return new class extends Migration
             $table->string('marca')->nullable();
             $table->string('modelo')->nullable();
 
-            // campos nuevos
             $table->boolean('activo')->default(true);
-            $table->foreignId('current_driver_id')->nullable()->constrained('users')->onDelete('set null');
+
+            $table->unsignedBigInteger('current_driver_id')->nullable();
+
             $table->string('status')->default('available');
             $table->integer('capacity')->nullable();
             $table->integer('year')->nullable();
 
-            $table->foreignId('user_id')->nullable()->constrained()->onDelete('cascade');
+            $table->unsignedBigInteger('user_id')->nullable();
+
             $table->string('perfil_id');
             $table->timestamps();
         });

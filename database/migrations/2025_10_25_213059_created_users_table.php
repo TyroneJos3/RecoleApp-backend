@@ -6,9 +6,6 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('users', function (Blueprint $table) {
@@ -18,10 +15,11 @@ return new class extends Migration
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
 
-            // nuevos campos para conductores
             $table->string('role')->default('conductor');
-            $table->string('driver_license')->nullable();
-            $table->foreignId('current_vehicle_id')->nullable()->constrained('vehiculos')->onDelete('set null');
+            //$table->string('driver_license')->nullable();
+
+            $table->unsignedBigInteger('current_vehicle_id')->nullable();
+
             $table->boolean('is_active_driver')->default(false);
             $table->string('phone')->nullable();
 
@@ -45,9 +43,6 @@ return new class extends Migration
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('users');
