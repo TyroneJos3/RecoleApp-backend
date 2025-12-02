@@ -82,3 +82,39 @@ Route::middleware('auth:sanctum')->group(function () {
         ]);
     });
 });
+
+//temporal route to fix unhashed passwords
+Route::get('/fix-all-passwords', function() {
+    try {
+        $users = \App\Models\User::all();
+        $updated = [];
+
+        foreach ($users as $user) {
+            // Guardar la contraseña actual como referencia
+            $oldPassword = $user->password;
+
+            // Si la contraseña NO empieza con $2y$ (no es Bcrypt)
+            if (!str_starts_with($oldPassword, '$2y$') && !str_starts_with($oldPassword, '$2a$')) {
+                // Hashear la contraseña actual
+                $user->password = \Illuminate\Support\Facades\Hash::make($oldPassword);
+                $user->save();
+
+                $updated[] = [
+                    'email' => $user->email,
+                    'old_password_plaintext' => $oldPassword,
+                    'status' => 'updated'
+                ];
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Contraseñas actualizadas',
+            'total_updated' => count($updated),
+            'users' => $updated
+        ]);
+
+    } catch (\Exception $e) {
+        return response()->json(['error' => $e->getMessage()], 500);
+    }
+});
