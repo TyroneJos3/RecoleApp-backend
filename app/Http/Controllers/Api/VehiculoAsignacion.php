@@ -291,7 +291,7 @@ class VehiculoAsignacion extends Controller
         try {
             $drivers = User::where('role', 'conductor')
                         ->whereNull('current_vehicle_id')
-                        ->select('id', 'name', 'email', 'driver_license', 'role', 'current_vehicle_id')
+                        ->select('id', 'name', 'email', 'role', 'current_vehicle_id')
                         ->get();
 
             $drivers->transform(function ($driver) {
@@ -328,7 +328,7 @@ class VehiculoAsignacion extends Controller
                         ->with(['currentVehicle' => function($query) {
                             $query->select('id', 'placa', 'marca', 'modelo', 'activo');
                         }])
-                        ->select('id', 'name', 'email', 'driver_license', 'role', 'current_vehicle_id')
+                        ->select('id', 'name', 'email', 'role', 'current_vehicle_id')
                         ->get();
 
             $drivers->transform(function ($driver) {

@@ -19,7 +19,7 @@ class User extends Authenticatable
         'email',
         'password',
         'role',
-        'driver_license',
+        //'driver_license',
         'current_vehicle_id',
         'is_active_driver'
     ];

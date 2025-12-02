@@ -16,7 +16,7 @@ return new class extends Migration
             $table->string('password');
 
             $table->string('role')->default('conductor');
-            $table->string('driver_license')->nullable();
+            //$table->string('driver_license')->nullable();
 
             $table->unsignedBigInteger('current_vehicle_id')->nullable();
 
