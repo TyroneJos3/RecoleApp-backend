@@ -13,7 +13,6 @@ use Illuminate\Support\Facades\Log;
 
 class VehiculoAsignacion extends Controller
 {
-
     public function assignVehicle(Request $request, $vehicleId)
     {
         Log::info('Asignando vehículo', [
@@ -42,11 +41,9 @@ class VehiculoAsignacion extends Controller
 
         return DB::transaction(function () use ($request, $vehicleId) {
             try {
-                // Buscar vehículo
                 $vehicle = Vehiculo::findOrFail($vehicleId);
                 Log::info('Vehículo encontrado', ['vehicle' => $vehicle]);
 
-                // Buscar conductor
                 $driver = User::where('id', $request->usuario_id)
                             ->where('role', 'conductor')
                             ->first();
@@ -64,7 +61,6 @@ class VehiculoAsignacion extends Controller
 
                 Log::info('Conductor encontrado', ['driver' => $driver]);
 
-                // Si el conductor ya tiene un vehículo asignado, desasignarlo primero
                 if ($driver->current_vehicle_id && $driver->current_vehicle_id != $vehicleId) {
                     Log::info('Conductor tiene vehículo previo, desasignando', [
                         'previous_vehicle_id' => $driver->current_vehicle_id
@@ -74,7 +70,6 @@ class VehiculoAsignacion extends Controller
                     if ($previousVehicle) {
                         $previousVehicle->update(['current_driver_id' => null]);
 
-                        // Finalizar asignación anterior
                         Asignacion::where('vehicle_id', $driver->current_vehicle_id)
                             ->where('driver_id', $driver->id)
                             ->where('status', 'active')
@@ -86,7 +81,6 @@ class VehiculoAsignacion extends Controller
                     }
                 }
 
-                // Si el vehículo ya está asignado a otro conductor, desasignarlo
                 if ($vehicle->current_driver_id && $vehicle->current_driver_id != $request->usuario_id) {
                     Log::info('Vehículo tiene conductor previo, desasignando', [
                         'previous_driver_id' => $vehicle->current_driver_id
@@ -96,7 +90,6 @@ class VehiculoAsignacion extends Controller
                     if ($previousDriver) {
                         $previousDriver->update(['current_vehicle_id' => null]);
 
-                        // Finalizar asignación anterior
                         Asignacion::where('vehicle_id', $vehicleId)
                             ->where('driver_id', $previousDriver->id)
                             ->where('status', 'active')
@@ -108,7 +101,6 @@ class VehiculoAsignacion extends Controller
                     }
                 }
 
-                // Crear nueva asignación
                 $assignment = Asignacion::create([
                     'vehicle_id' => $vehicleId,
                     'driver_id' => $request->usuario_id,
@@ -119,12 +111,10 @@ class VehiculoAsignacion extends Controller
 
                 Log::info('Asignación creada', ['assignment' => $assignment]);
 
-                // Actualizar vehículo
                 $vehicle->update([
                     'current_driver_id' => $request->usuario_id
                 ]);
 
-                // Actualizar conductor
                 $driver->update([
                     'current_vehicle_id' => $vehicleId,
                     'is_active_driver' => true
@@ -155,7 +145,6 @@ class VehiculoAsignacion extends Controller
             }
         });
     }
-
 
     public function unassignVehicle(Request $request, $vehicleId)
     {
@@ -245,170 +234,246 @@ class VehiculoAsignacion extends Controller
         });
     }
 
-
     public function getVehiclesWithDrivers(Request $request)
     {
-        $perfilId = $request->query('perfil_id');
-        $includeDriver = $request->query('incluir_conductor', true);
+        try {
+            $perfilId = $request->query('perfil_id');
+            $includeDriver = $request->query('incluir_conductor', true);
 
-        $query = Vehiculo::query();
+            $query = Vehiculo::query();
 
-        if ($perfilId) {
-            $query->where('perfil_id', $perfilId);
+            if ($perfilId) {
+                $query->where('perfil_id', $perfilId);
+            }
+
+            if ($includeDriver) {
+                $query->with('currentDriver:id,name,email,role,current_vehicle_id');
+            }
+
+            $vehicles = $query->get();
+
+            $vehicles->transform(function ($vehicle) {
+                return [
+                    'id' => $vehicle->id,
+                    'placa' => $vehicle->placa,
+                    'marca' => $vehicle->marca,
+                    'modelo' => $vehicle->modelo,
+                    'activo' => (bool)$vehicle->activo,
+                    'current_driver_id' => $vehicle->current_driver_id,
+                    'conductor_actual' => $vehicle->currentDriver ? [
+                        'id' => $vehicle->currentDriver->id,
+                        'nombre' => $vehicle->currentDriver->name,
+                        'email' => $vehicle->currentDriver->email,
+                        'role' => $vehicle->currentDriver->role
+                    ] : null
+                ];
+            });
+
+            return response()->json([
+                'success' => true,
+                'data' => $vehicles
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error en getVehiclesWithDrivers', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al obtener vehículos: ' . $e->getMessage()
+            ], 500);
         }
-
-        if ($includeDriver) {
-            $query->with('currentDriver:id,name,email,role,current_vehicle_id');
-        }
-
-        $vehicles = $query->get();
-
-        $vehicles->transform(function ($vehicle) {
-            return [
-                'id' => $vehicle->id,
-                'placa' => $vehicle->placa,
-                'marca' => $vehicle->marca,
-                'modelo' => $vehicle->modelo,
-                'activo' => (bool)$vehicle->activo,
-                'current_driver_id' => $vehicle->current_driver_id,
-                'conductor_actual' => $vehicle->currentDriver ? [
-                    'id' => $vehicle->currentDriver->id,
-                    'nombre' => $vehicle->currentDriver->name,
-                    'email' => $vehicle->currentDriver->email,
-                    'role' => $vehicle->currentDriver->role
-                ] : null
-            ];
-        });
-
-        return response()->json([
-            'success' => true,
-            'data' => $vehicles
-        ]);
     }
 
-
-   public function getAvailableDrivers()
+    public function getAvailableDrivers()
     {
-        $drivers = User::where('role', 'conductor')
-                    ->whereNull('current_vehicle_id')
-                    ->select('id', 'name', 'email', 'driver_license', 'role', 'current_vehicle_id')
-                    ->get();
+        try {
+            $drivers = User::where('role', 'conductor')
+                        ->whereNull('current_vehicle_id')
+                        ->select('id', 'name', 'email', 'driver_license', 'role', 'current_vehicle_id')
+                        ->get();
 
-        // Transformar la respuesta
-        $drivers->transform(function ($driver) {
-            return [
-                'id' => $driver->id,
-                'nombre' => $driver->name,
-                'email' => $driver->email,
-                'disponible' => true,
-                'vehiculo_asignado' => null
-            ];
-        });
+            $drivers->transform(function ($driver) {
+                return [
+                    'id' => $driver->id,
+                    'nombre' => $driver->name,
+                    'email' => $driver->email,
+                    'disponible' => true,
+                    'vehiculo_asignado' => null
+                ];
+            });
 
-        return response()->json([
-            'success' => true,
-            'data' => $drivers
-        ]);
+            return response()->json([
+                'success' => true,
+                'data' => $drivers
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error en getAvailableDrivers', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al obtener conductores disponibles: ' . $e->getMessage()
+            ], 500);
+        }
     }
-
 
     public function getAllDrivers()
     {
-        $drivers = User::where('role', 'conductor')
-                    ->with('currentVehicle:id,placa,marca,modelo')
-                    ->select('id', 'name', 'email', 'driver_license', 'role', 'current_vehicle_id')
-                    ->get();
+        try {
+            $drivers = User::where('role', 'conductor')
+                        ->with(['currentVehicle' => function($query) {
+                            $query->select('id', 'placa', 'marca', 'modelo', 'activo');
+                        }])
+                        ->select('id', 'name', 'email', 'driver_license', 'role', 'current_vehicle_id')
+                        ->get();
 
-        // Transformar la respuesta
-        $drivers->transform(function ($driver) {
-            return [
-                'id' => $driver->id,
-                'nombre' => $driver->name,
-                'email' => $driver->email,
-                'disponible' => !$driver->current_vehicle_id,
-                'vehiculo_asignado' => $driver->currentVehicle ? [
-                    'id' => $driver->currentVehicle->id,
-                    'placa' => $driver->currentVehicle->placa,
-                    'marca' => $driver->currentVehicle->marca,
-                    'modelo' => $driver->currentVehicle->modelo
-                ] : null
-            ];
-        });
+            $drivers->transform(function ($driver) {
+                return [
+                    'id' => $driver->id,
+                    'nombre' => $driver->name,
+                    'email' => $driver->email,
+                    'disponible' => !$driver->current_vehicle_id,
+                    'vehiculo_asignado' => $driver->currentVehicle ? [
+                        'id' => $driver->currentVehicle->id,
+                        'placa' => $driver->currentVehicle->placa,
+                        'marca' => $driver->currentVehicle->marca,
+                        'modelo' => $driver->currentVehicle->modelo
+                    ] : null
+                ];
+            });
 
-        return response()->json([
-            'success' => true,
-            'data' => $drivers
-        ]);
+            return response()->json([
+                'success' => true,
+                'data' => $drivers
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error en getAllDrivers', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al obtener todos los conductores: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     public function getVehicleAssignmentHistory($vehicleId)
     {
-        $assignments = Asignacion::with('driver')
-                        ->where('vehicle_id', $vehicleId)
-                        ->orderBy('created_at', 'desc')
-                        ->get();
+        try {
+            $assignments = Asignacion::with('driver')
+                            ->where('vehicle_id', $vehicleId)
+                            ->orderBy('created_at', 'desc')
+                            ->get();
 
-        return response()->json([
-            'success' => true,
-            'data' => $assignments
-        ]);
+            return response()->json([
+                'success' => true,
+                'data' => $assignments
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error en getVehicleAssignmentHistory', [
+                'error' => $e->getMessage()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al obtener historial: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     public function getDriverAssignmentHistory($driverId)
     {
-        $assignments = Asignacion::with('vehicle')
-                        ->where('driver_id', $driverId)
-                        ->orderBy('created_at', 'desc')
-                        ->get();
+        try {
+            $assignments = Asignacion::with('vehicle')
+                            ->where('driver_id', $driverId)
+                            ->orderBy('created_at', 'desc')
+                            ->get();
 
-        return response()->json([
-            'success' => true,
-            'data' => $assignments
-        ]);
+            return response()->json([
+                'success' => true,
+                'data' => $assignments
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error en getDriverAssignmentHistory', [
+                'error' => $e->getMessage()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al obtener historial: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     public function getActiveAssignment($driverId)
     {
-        $assignment = Asignacion::where('status', 'active')
-                        ->where('driver_id', $driverId)
-                        ->with(['vehicle', 'driver'])
-                        ->first();
+        try {
+            $assignment = Asignacion::where('status', 'active')
+                            ->where('driver_id', $driverId)
+                            ->with(['vehicle', 'driver'])
+                            ->first();
 
-        if (!$assignment) {
+            if (!$assignment) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No hay asignación activa para este conductor'
+                ], 404);
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => $assignment
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error en getActiveAssignment', [
+                'error' => $e->getMessage()
+            ]);
+
             return response()->json([
                 'success' => false,
-                'message' => 'No hay asignación activa para este conductor'
-            ], 404);
+                'message' => 'Error al obtener asignación activa: ' . $e->getMessage()
+            ], 500);
         }
-
-        return response()->json([
-            'success' => true,
-            'data' => $assignment
-        ]);
     }
-
 
     public function index(Request $request)
     {
-        $query = Asignacion::with(['vehicle', 'driver']);
+        try {
+            $query = Asignacion::with(['vehicle', 'driver']);
 
-        if ($request->has('status')) {
-            $query->where('status', $request->status);
+            if ($request->has('status')) {
+                $query->where('status', $request->status);
+            }
+
+            if ($request->has('driver_id')) {
+                $query->where('driver_id', $request->driver_id);
+            }
+
+            if ($request->has('vehicle_id')) {
+                $query->where('vehicle_id', $request->vehicle_id);
+            }
+
+            $assignments = $query->latest()->get();
+
+            return response()->json([
+                'success' => true,
+                'data' => $assignments
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error en index', [
+                'error' => $e->getMessage()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al obtener asignaciones: ' . $e->getMessage()
+            ], 500);
         }
-
-        if ($request->has('driver_id')) {
-            $query->where('driver_id', $request->driver_id);
-        }
-
-        if ($request->has('vehicle_id')) {
-            $query->where('vehicle_id', $request->vehicle_id);
-        }
-
-        $assignments = $query->latest()->get();
-
-        return response()->json([
-            'success' => true,
-            'data' => $assignments
-        ]);
     }
 }
