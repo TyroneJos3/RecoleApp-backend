@@ -13,6 +13,10 @@ use App\Http\Controllers\Api\PosicionController;
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
 
+// Endpoint público para obtener UUID del vehículo (requerido por frontend)
+// DEBE ESTAR ANTES del apiResource para que no sea interceptado
+Route::get('/vehiculos/uuid/{id}', [VehiculoController::class, 'getUuid']);
+
 // rutas protegidas
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
@@ -23,7 +27,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/users/{id}', [UserController::class, 'destroy']);
 
     // vehículos
-    Route::apiResource('vehiculos', VehiculoController::class);
+    //Route::apiResource('vehiculos', VehiculoController::class);
 
     // asignaciones de vehículos
     Route::get('/asignaciones', [VehiculoAsignacion::class, 'index']);

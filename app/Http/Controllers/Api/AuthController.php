@@ -95,7 +95,7 @@ class AuthController extends Controller
                 ], 401);
             }
 
-            $user->load('currentVehicle:id,placa,marca,modelo,activo');
+            $user->load('currentVehicle:id,vehiculo_id,placa,marca,modelo,activo');
 
             $token = $user->createToken('auth_token')->plainTextToken;
 
@@ -118,6 +118,7 @@ class AuthController extends Controller
                         'role' => $user->role,
                         'vehiculo_asignado' => $user->currentVehicle ? [
                             'id' => $user->currentVehicle->id,
+                            'uuid' => $user->currentVehicle->vehiculo_id,
                             'placa' => $user->currentVehicle->placa,
                             'marca' => $user->currentVehicle->marca,
                             'modelo' => $user->currentVehicle->modelo,
@@ -151,7 +152,7 @@ class AuthController extends Controller
                 ], 401);
             }
 
-            $user->load('currentVehicle:id,placa,marca,modelo,activo');
+            $user->load('currentVehicle:id,vehiculo_id,placa,marca,modelo,activo');
             Log::info('Endpoint /api/user llamado', [
                 'user_id' => $user->id,
                 'email' => $user->email,
@@ -171,6 +172,7 @@ class AuthController extends Controller
                 'rol' => $user->role,
                 'vehiculo_asignado' => $user->currentVehicle ? [
                     'id' => $user->currentVehicle->id,
+                    'uuid' => $user->currentVehicle->vehiculo_id,
                     'placa' => $user->currentVehicle->placa,
                     'marca' => $user->currentVehicle->marca,
                     'modelo' => $user->currentVehicle->modelo,

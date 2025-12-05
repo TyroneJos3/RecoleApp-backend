@@ -17,8 +17,9 @@ class RecorridoController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'ruta_id' => 'required|string',
-            'vehiculo_id' => 'required|integer',
+            'vehiculo_id' => 'required',
             'conductor_id' => 'required|string',
+            'perfil_id' => 'required|string',
             'inicio' => 'required|date',
             'activo' => 'sometimes|boolean',
         ]);
@@ -37,14 +38,54 @@ class RecorridoController extends Controller
         }
 
         try {
+            $vehiculoId = $request->vehiculo_id;
+            $perfilId = $request->perfil_id;
+
+            Log::info('Store recorrido - vehiculo_id recibido:', [
+                'vehiculo_id' => $vehiculoId,
+                'perfil_id' => $perfilId,
+                'es_uuid' => is_string($vehiculoId) && preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $vehiculoId)
+            ]);
+
+            // Si es un UUID (contiene guiones), usarlo directamente
+            if (is_string($vehiculoId) && strpos($vehiculoId, '-') !== false) {
+                $vehiculoUuid = $vehiculoId;
+                Log::info('Usando vehiculo_id como UUID directamente:', ['uuid' => $vehiculoUuid]);
+            } else {
+                // Si es un ID numérico, obtener el vehículo y extraer su UUID
+                Log::info('Buscando vehículo por ID numérico:', ['id' => $vehiculoId]);
+                $vehiculo = Vehiculo::find($vehiculoId);
+
+                if (!$vehiculo) {
+                    Log::error('Vehículo no encontrado:', ['id' => $vehiculoId]);
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Vehículo no encontrado'
+                    ], 404);
+                }
+
+                // Validar que el vehículo tiene un UUID válido
+                $vehiculoUuid = $vehiculo->vehiculo_id;
+                Log::info('UUID extraído del vehículo:', ['uuid' => $vehiculoUuid, 'vehiculo' => $vehiculo->id]);
+
+                if (!$vehiculoUuid) {
+                    Log::error('Vehículo sin UUID asignado:', ['id' => $vehiculoId]);
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'El vehículo no tiene un UUID asignado por la API del profesor'
+                    ], 400);
+                }
+            }
+
             // Generar un UUID único para recorrido_remoto_id
             $recorridoRemotoId = Str::uuid()->toString();
 
             $recorrido = Recorrido::create([
                 'recorrido_remoto_id' => $recorridoRemotoId,
                 'ruta_id' => $request->ruta_id,
-                'vehiculo_id' => (string) $request->vehiculo_id,
+                'vehiculo_id' => $vehiculoUuid,
                 'conductor_id' => $request->conductor_id,
+                'perfil_id' => $perfilId,
                 'inicio' => $request->inicio,
                 'activo' => $request->activo ?? true,
             ]);
@@ -52,7 +93,9 @@ class RecorridoController extends Controller
             Log::info('Recorrido creado exitosamente', [
                 'recorrido_id' => $recorrido->id,
                 'recorrido_remoto_id' => $recorrido->recorrido_remoto_id,
-                'conductor_id' => $recorrido->conductor_id
+                'conductor_id' => $recorrido->conductor_id,
+                'vehiculo_id_guardado' => $recorrido->vehiculo_id,
+                'vehiculo_uuid' => $vehiculoUuid
             ]);
 
             return response()->json([

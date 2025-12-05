@@ -10,12 +10,17 @@ class Vehiculo extends Model
     use HasFactory;
 
     protected $fillable = [
+        'vehiculo_id',
         'placa',
         'marca',
         'modelo',
         'activo',
         'perfil_id',
-        'current_driver_id'
+        'current_driver_id',
+        'user_id',
+        'status',
+        'capacity',
+        'year'
     ];
 
     protected $casts = [

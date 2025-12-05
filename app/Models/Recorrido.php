@@ -15,6 +15,7 @@ class Recorrido extends Model
         'ruta_id',
         'vehiculo_id',
         'conductor_id',
+        'perfil_id',
         'inicio',
         'fin',
         'distancia_total',

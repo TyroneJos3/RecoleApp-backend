@@ -158,6 +158,37 @@ class VehiculoController extends Controller
         ], 200);
     }
 
+    /**
+     * Obtener el UUID del vehículo (vehiculo_id) por su ID numérico
+     * Endpoint: GET /api/vehiculos/{id}/uuid
+     */
+    public function getUuid($id)
+    {
+        $vehiculo = Vehiculo::select('id', 'vehiculo_id', 'placa', 'perfil_id')->find($id);
 
+        if (!$vehiculo) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Vehículo no encontrado'
+            ], 404);
+        }
+
+        if (!$vehiculo->vehiculo_id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'El vehículo no tiene UUID asignado'
+            ], 400);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'id' => $vehiculo->id,
+                'vehiculo_id' => $vehiculo->vehiculo_id,
+                'placa' => $vehiculo->placa,
+                'perfil_id' => $vehiculo->perfil_id
+            ]
+        ], 200);
+    }
 
 }
